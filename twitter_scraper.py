@@ -74,23 +74,26 @@ class FoodNews(Scraper):
         scrape_page : Soup of scraped url.
             Uses fstring to form a proper url with attr "page_count"
             Example: {http://www.foodnews.com/articles/category/24}/{1}"""
+        page_count = 1
         while True:
-            page_count = 1
             scrape_page = self.scrape_url(f"{self.url}/{page_count}")
 
             collected_links = self._collect_links(scrape_page)
 
-
-
-            # TODO - make it grab the correct product info and set in dataclass
-            # Create private method for this and add under here
-            # So that means we are automatically grabbing for each page
-
-
             if not collected_links:
                 break  # Empty page, end of pages reached
+            # if page_count == 2:
+            #     break
+
+            self._set_product_data(collected_links)
+
 
             page_count +=1
+            print(page_count)
+        
+        df = pd.DataFrame(p for p in self.scraped_data)
+        print(df)
+        df.to_excel("test.xlsx")
 
         
     def _collect_links(self, scraped_page):
@@ -102,36 +105,49 @@ class FoodNews(Scraper):
     def _set_product_data(self, links):
         for link in links:
             scrape_page = self.scrape_url(link)
-            name = self._format_item(scrape_page, "#clm-mainBody > h1")
-            manufacturer = 
-            sales_date = 
-            category = 
-            # etc...
+            name = self._format_item(
+                scrape_page, "#clm-mainBody > h1")
+            print(f"linking = {name}")
+            manufacturer = self._format_item(
+                scrape_page, "tr:nth-child(1) > td")
+            sales_date = self._format_item(
+                scrape_page, "tr:nth-child(3) > td")
+            category = self._format_item(
+                scrape_page, "tr:nth-child(2) > td")
+            quantity = self._format_item(
+                scrape_page, "tr:nth-child(7) > td")
+            price = self._format_item(
+                scrape_page, "tr:nth-child(6) > td")
+            description = self._format_item(
+                scrape_page, "#productDetail > table")
+            image = f"{self.domain}/" \
+                    f"{self._format_item(scrape_page, '#productDetail > img')}"
 
-            # unquote(kanji text).encode("latin1").decode("utf-8")
+            self.scraped_data.append(Product(
+                name, 
+                manufacturer, 
+                sales_date, 
+                category, 
+                quantity, 
+                price, 
+                description, 
+                image)
+            )
+            print(f"product linked - {name}")
     
     def _format_item(self, scraped_page, item):
         scraped_item = scraped_page.select(item)
+        if "img" in item:
+            try:
+                return scraped_item[0].get("src")
+            except IndexError:
+                return "No image available"
+                
         encoded_item = scraped_item[0].text.strip()
-        return unquote(encoded_item).encode("latin1").decode("utf-8")
+        return unquote(
+            encoded_item).encode("latin1").decode("utf-8", errors="ignore"
+            )
 
-
-
-        
-        
-    
-
-
-
-
-
-    
-
-
-
-    
-    pass
-    # init has url, data of already existing data, which could be a list of class 'Product'
 
 @dataclass
 class Product:
@@ -148,9 +164,6 @@ class Product:
         return self.sales_date < object.sales_date
 
 
-
-
-# An ABC for 1 class that defines attributes??
-
 if __name__ == '__main__':
-    pass  # initiate the scraper
+    w = FoodNews("http://www.foodsnews.com/articles/category/24", [])
+    w.collect_data()
